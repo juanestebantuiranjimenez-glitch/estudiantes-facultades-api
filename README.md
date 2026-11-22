@@ -1,35 +1,57 @@
-# API Estudiantes - Facultades
+# API Estudiantes - Facultades (documentos embebidos)
 
 Proyecto final de Base de Datos: API REST con **CRUD completo** para el modelo
-**1:N facultades -> estudiantes**, con **paginación**, **3 validaciones**,
-**trim** y soporte para **tildes y ñ**.
+**1:N facultades -> estudiantes** usando **documentos embebidos** en MongoDB,
+con **paginación**, **3 validaciones**, **trim** y soporte para **tildes y ñ**.
 
 Stack: **Node.js + Express + MongoDB** (driver oficial `mongodb`).
 
+> En esta versión **no existe una colección `estudiantes`**. Cada facultad es un
+> documento que contiene un arreglo llamado `estudiantes` con sus estudiantes
+> embebidos.
+
 ---
 
-## 1. Modelo 1:N
-
-MongoDB no usa tablas, pero la relación se representa con una **referencia**:
-cada estudiante guarda el `_id` de su facultad en el campo `facultadId`.
+## 1. Modelo 1:N embebido
 
 ```text
-facultades (1)                     estudiantes (N)
-------------------                 -------------------------
-_id          <-----------------    facultadId
-nombre                             _id
-codigo (único)                     nombre
-creadoEn                           email (único)
-                                   edad
-                                   semestre
-                                   creadoEn
+colección: facultades
+
+{
+  "_id": ObjectId("..."),
+  "nombre": "Ingeniería de Sistemas",
+  "codigo": "ING-SIS",
+  "estudiantes": [                     <-- arreglo embebido (lado N)
+    {
+      "_id": ObjectId("..."),
+      "nombre": "José Ñáñez",
+      "email": "jose.nanez@correo.com",
+      "edad": 20,
+      "semestre": 4,
+      "creadoEn": ISODate("...")
+    },
+    {
+      "_id": ObjectId("..."),
+      "nombre": "María Peña",
+      "email": "maria.pena@correo.com",
+      "edad": 21,
+      "semestre": 5,
+      "creadoEn": ISODate("...")
+    }
+  ],
+  "creadoEn": ISODate("...")
+}
 ```
 
-- Una facultad tiene **muchos** estudiantes.
-- Un estudiante pertenece a **una sola** facultad.
-- El índice sobre `facultadId` hace rápidas las consultas por facultad.
-- En `GET /api/facultades` se usa `$lookup` para contar los estudiantes de cada facultad.
-- No se puede eliminar una facultad que tenga estudiantes (integridad de la relación).
+- Una facultad tiene **muchos** estudiantes dentro de su arreglo `estudiantes`.
+- Un estudiante pertenece a **una sola** facultad porque vive dentro de ella.
+- No hay que hacer `JOIN` ni `$lookup`: al consultar la facultad ya vienen sus estudiantes.
+- Si se elimina la facultad, sus estudiantes embebidos se eliminan con ella.
+- Los estudiantes se modifican con operadores de MongoDB:
+  - `$push` para agregar.
+  - `$pull` para eliminar.
+  - `$set` con `estudiantes.$` para actualizar el estudiante encontrado.
+- Índices creados: `codigo` (único), `estudiantes.email` y `estudiantes._id`.
 
 ---
 
@@ -88,143 +110,268 @@ Ejemplo:
 PORT=4000 MONGODB_DB=mi_base npm start
 ```
 
-Al primer arranque se crean **3 facultades de ejemplo** si la colección está
-vacía, para poder probar la API de inmediato.
+Al primer arranque se crean **3 facultades de ejemplo con 6 estudiantes
+embebidos**, para poder probar la API y ver los documentos en Compass.
 
 ---
 
-## 4. Endpoints
+## 4. Ver la base de datos en MongoDB Compass
+
+MongoDB crea la base de datos **cuando se inserta el primer documento**. Por eso,
+si nunca has ejecutado la API, en Compass no aparece nada. La base se crea al
+correr `npm start` por primera vez.
+
+Pasos:
+
+1. Verifica que MongoDB esté corriendo:
+
+   ```bash
+   mongosh --quiet --eval "db.runCommand({ ping: 1 })"
+   ```
+
+2. Arranca la API una vez:
+
+   ```bash
+   npm start
+   ```
+
+3. Abre **MongoDB Compass** y conéctate a:
+
+   ```text
+   mongodb://127.0.0.1:27017
+   ```
+
+   (también funciona `mongodb://localhost:27017`).
+
+4. Pulsa el botón de **refrescar** en Compass.
+
+5. Debes ver la base de datos `estudiantes_facultades` y, dentro, **una sola
+   colección** llamada `facultades`:
+
+   ```text
+   estudiantes_facultades
+   └── facultades
+       ├── Ingeniería de Sistemas
+       │   └── estudiantes: [ ... ]   <-- documentos embebidos
+       ├── Ciencias de la Salud
+       │   └── estudiantes: [ ... ]
+       └── Administración de Empresas
+           └── estudiantes: [ ... ]
+   ```
+
+6. Abre cualquier documento de `facultades` y despliega el arreglo
+   `estudiantes`. Ahí están los estudiantes embebidos.
+
+**No verás una colección `estudiantes` separada**: eso es correcto en este
+modelo, porque los estudiantes están dentro de cada facultad.
+
+Si aun así no aparece la base:
+
+- Confirma que Compass está conectado a `127.0.0.1:27017` y no a otra conexión.
+- Pulsa refrescar en Compass.
+- Revisa desde la terminal:
+
+  ```bash
+  mongosh --quiet --eval "db.getMongo().getDBNames()"
+  ```
+
+- Ejecuta `npm start` al menos una vez para que se cree la base.
+
+Si venías de una versión anterior con una colección `estudiantes` separada,
+puedes eliminarla (esta versión no la usa):
+
+```bash
+mongosh estudiantes_facultades --eval "db.estudiantes.drop()"
+```
+
+---
+
+## 5. Endpoints
 
 ### Facultades
 
-| Método   | Ruta                                        | Descripción                                  |
-| -------- | ------------------------------------------- | -------------------------------------------- |
-| `GET`    | `/api/facultades?page=1&limit=5`            | Lista paginada (incluye total de estudiantes) |
-| `GET`    | `/api/facultades/:id`                       | Consulta una facultad                        |
-| `GET`    | `/api/facultades/:id/estudiantes?page=1&limit=5` | Estudiantes de la facultad (1:N)        |
-| `POST`   | `/api/facultades`                           | Crea una facultad                            |
-| `PUT`    | `/api/facultades/:id`                       | Actualiza una facultad                       |
-| `DELETE` | `/api/facultades/:id`                       | Elimina una facultad sin estudiantes         |
+| Método   | Ruta                                        | Descripción                                            |
+| -------- | ------------------------------------------- | ------------------------------------------------------ |
+| `GET`    | `/api/facultades?page=1&limit=5`            | Lista paginada con `totalEstudiantes`                  |
+| `GET`    | `/api/facultades/:id`                       | Documento completo con estudiantes embebidos           |
+| `GET`    | `/api/facultades/:id/estudiantes?page=1&limit=5` | Arreglo embebido paginado con `$slice`            |
+| `POST`   | `/api/facultades`                           | Crea una facultad con `estudiantes: []`                |
+| `PUT`    | `/api/facultades/:id`                       | Actualiza nombre y código                              |
+| `DELETE` | `/api/facultades/:id`                       | Elimina la facultad y sus estudiantes embebidos        |
 
 ### Estudiantes
 
-| Método   | Ruta                                             | Descripción                          |
-| -------- | ------------------------------------------------ | ------------------------------------ |
-| `GET`    | `/api/estudiantes?page=1&limit=5&facultadId=...` | Lista paginada (filtro opcional)     |
-| `GET`    | `/api/estudiantes/:id`                           | Consulta un estudiante y su facultad |
-| `POST`   | `/api/estudiantes`                               | Crea un estudiante                   |
-| `PUT`    | `/api/estudiantes/:id`                           | Actualiza un estudiante              |
-| `DELETE` | `/api/estudiantes/:id`                           | Elimina un estudiante                |
+| Método   | Ruta                                             | Descripción                                       |
+| -------- | ------------------------------------------------ | ------------------------------------------------- |
+| `GET`    | `/api/estudiantes?page=1&limit=5&facultadId=...` | Lista global paginada de todos los embebidos      |
+| `GET`    | `/api/estudiantes/:id`                           | Consulta un estudiante y su facultad              |
+| `POST`   | `/api/estudiantes`                               | Inserta el estudiante dentro de su facultad       |
+| `PUT`    | `/api/estudiantes/:id`                           | Actualiza los datos del estudiante embebido       |
+| `DELETE` | `/api/estudiantes/:id`                           | Saca el estudiante del arreglo embebido           |
 
-`PUT` recibe todos los campos (actualización completa). El `limit` por defecto
-es `5` y el máximo permitido es `50`.
+`PUT` recibe todos los campos. Para actualizar un estudiante debes enviar la
+**misma facultad** donde está embebido; para cambiarlo de facultad hay que
+eliminarlo y crearlo de nuevo. El `limit` por defecto es `5` y el máximo es `50`.
 
 ---
 
-## 5. Flujo de prueba con curl
+## 6. Flujo de prueba con curl
 
-### 5.1 Ver las facultades de ejemplo
+### 6.1 Ver las facultades de ejemplo
 
 ```bash
 curl http://localhost:3000/api/facultades
 ```
 
-Guardar el id de la primera facultad en una variable (requiere `jq`):
+Cada facultad trae `totalEstudiantes` (3, 2 y 1) pero no el arreglo completo.
+
+### 6.2 Guardar el id de una facultad
 
 ```bash
-FACULTAD_ID=$(curl -s http://localhost:3000/api/facultades | jq -r '.data[0]._id')
+FACULTAD_ID=$(curl -s http://localhost:3000/api/facultades \
+  | jq -r '.data[] | select(.codigo=="ING-SIS") | ._id')
+
 echo "$FACULTAD_ID"
 ```
 
 Si no tienes `jq`, copia el `_id` que aparece en la respuesta.
 
-### 5.2 Crear una facultad
+### 6.3 Ver una facultad con sus estudiantes embebidos
 
 ```bash
-curl -X POST http://localhost:3000/api/facultades \
+curl "http://localhost:3000/api/facultades/$FACULTAD_ID"
+```
+
+La respuesta incluye el arreglo `estudiantes` dentro del mismo documento.
+
+### 6.4 Paginar los estudiantes de una facultad
+
+```bash
+curl "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes?page=1&limit=2"
+curl "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes?page=2&limit=2"
+```
+
+La primera página trae 2 de 3 estudiantes y `totalPaginas: 2`.
+
+### 6.5 Listar todos los estudiantes con paginación
+
+```bash
+curl "http://localhost:3000/api/estudiantes?page=1&limit=5"
+curl "http://localhost:3000/api/estudiantes?page=2&limit=5"
+```
+
+Como los estudiantes están embebidos, la API recorre las facultades, arma una
+lista plana, la ordena y la pagina. La respuesta incluye el objeto `facultad` de
+cada estudiante.
+
+### 6.6 Filtrar por facultad
+
+```bash
+curl "http://localhost:3000/api/estudiantes?facultadId=$FACULTAD_ID&page=1&limit=5"
+```
+
+### 6.7 Crear una facultad
+
+```bash
+NUEVA_FACULTAD_ID=$(curl -s -X POST http://localhost:3000/api/facultades \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"  Ingeniería   Ambiental  ","codigo":"ing-amb"}'
+  -d '{"nombre":"  Ingeniería   Ambiental  ","codigo":"ing-amb"}' \
+  | jq -r '.data._id')
+
+echo "$NUEVA_FACULTAD_ID"
 ```
 
 El nombre se guarda como `Ingeniería Ambiental` (trim y espacios normalizados)
 y el código como `ING-AMB`.
 
-### 5.3 Crear un estudiante
+### 6.8 Crear un estudiante embebido
 
 ```bash
 curl -X POST http://localhost:3000/api/estudiantes \
   -H "Content-Type: application/json" \
   -d "{
-    \"nombre\": \"  José   Ñáñez  \",
-    \"email\": \"  JOSE.NANEZ@correo.com  \",
+    \"nombre\": \"  Ana   Pérez  \",
+    \"email\": \"  ANA.PEREZ@correo.com  \",
     \"edad\": 20,
     \"semestre\": 4,
-    \"facultadId\": \"$FACULTAD_ID\"
+    \"facultadId\": \"$NUEVA_FACULTAD_ID\"
   }"
 ```
 
-Se guarda `nombre: "José Ñáñez"` y `email: "jose.nanez@correo.com"`.
+Se guarda `nombre: "Ana Pérez"` y `email: "ana.perez@correo.com"` **dentro del
+documento de la facultad**.
 
-### 5.4 Listar con paginación
-
-```bash
-curl "http://localhost:3000/api/estudiantes?page=1&limit=2"
-curl "http://localhost:3000/api/estudiantes?page=2&limit=2"
-```
-
-Respuesta:
-
-```json
-{
-  "data": [ ... ],
-  "paginacion": {
-    "pagina": 1,
-    "limite": 2,
-    "total": 5,
-    "totalPaginas": 3
-  }
-}
-```
-
-### 5.5 Filtrar por facultad
+Guardar el id del estudiante:
 
 ```bash
-curl "http://localhost:3000/api/estudiantes?facultadId=$FACULTAD_ID&page=1&limit=5"
-curl "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes?page=1&limit=5"
+ESTUDIANTE_ID=$(curl -s "http://localhost:3000/api/facultades/$NUEVA_FACULTAD_ID/estudiantes" \
+  | jq -r '.data[0]._id')
+
+echo "$ESTUDIANTE_ID"
 ```
 
-### 5.6 Consultar un estudiante
+### 6.9 Consultar el estudiante
 
 ```bash
-ESTUDIANTE_ID=$(curl -s "http://localhost:3000/api/estudiantes?limit=1" | jq -r '.data[0]._id')
 curl "http://localhost:3000/api/estudiantes/$ESTUDIANTE_ID"
 ```
 
-La respuesta incluye el objeto `facultad` para evidenciar la relación 1:N.
+La respuesta incluye su facultad.
 
-### 5.7 Actualizar
+### 6.10 Actualizar el estudiante
 
 ```bash
 curl -X PUT "http://localhost:3000/api/estudiantes/$ESTUDIANTE_ID" \
   -H "Content-Type: application/json" \
   -d "{
-    \"nombre\": \"José Ñáñez\",
-    \"email\": \"jose.nanez@correo.com\",
+    \"nombre\": \"  Ana   Pérez   Gómez  \",
+    \"email\": \"ana.perez@correo.com\",
     \"edad\": 21,
     \"semestre\": 5,
-    \"facultadId\": \"$FACULTAD_ID\"
+    \"facultadId\": \"$NUEVA_FACULTAD_ID\"
   }"
 ```
 
-### 5.8 Eliminar
+### 6.11 Eliminar el estudiante
 
 ```bash
 curl -X DELETE "http://localhost:3000/api/estudiantes/$ESTUDIANTE_ID"
 ```
 
+El estudiante se saca del arreglo con `$pull`.
+
+### 6.12 Borrado en cascada de una facultad
+
+Al estar embebidos, si se elimina la facultad también se eliminan sus
+estudiantes. Ejemplo con una facultad temporal:
+
+```bash
+TEMP_ID=$(curl -s -X POST http://localhost:3000/api/facultades \
+  -H "Content-Type: application/json" \
+  -d '{"nombre":"Facultad Temporal","codigo":"TEMP"}' \
+  | jq -r '.data._id')
+
+EST_TEMP_ID=$(curl -s -X POST http://localhost:3000/api/estudiantes \
+  -H "Content-Type: application/json" \
+  -d "{
+    \"nombre\": \"Carlos Ruiz\",
+    \"email\": \"carlos.ruiz@correo.com\",
+    \"edad\": 22,
+    \"semestre\": 6,
+    \"facultadId\": \"$TEMP_ID\"
+  }" \
+  | jq -r '.data._id')
+
+# Elimina la facultad y su estudiante embebido
+curl -X DELETE "http://localhost:3000/api/facultades/$TEMP_ID"
+
+# El estudiante ya no existe
+curl "http://localhost:3000/api/estudiantes/$EST_TEMP_ID"
+```
+
 ---
 
-## 6. Las 3 validaciones
+## 7. Las 3 validaciones
 
 ### Validación 1: campos obligatorios (después del trim)
 
@@ -249,36 +396,36 @@ curl -X POST http://localhost:3000/api/estudiantes \
 # Falla: el nombre contiene un número
 curl -X POST http://localhost:3000/api/estudiantes \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"Ana2","email":"ana@correo.com","edad":20,"semestre":4,"facultadId":"'"$FACULTAD_ID"'"}'
+  -d '{"nombre":"Ana2","email":"ana2@correo.com","edad":20,"semestre":4,"facultadId":"'"$FACULTAD_ID"'"}'
 ```
 
 ### Validación 3: unicidad
 
-- El `email` de un estudiante no puede repetirse.
+- El `email` de un estudiante no puede repetirse entre **todos** los embebidos.
 - El `codigo` de una facultad no puede repetirse.
 
-Se valida en el código y además con un **índice único** en MongoDB. Si se
-intenta repetir, la API responde `409 Conflict`.
+El código de facultad tiene un **índice único** en MongoDB. El email se valida
+con una consulta antes de insertar o actualizar, porque un índice único sobre
+`estudiantes.email` no es posible al ser un arreglo. Si se repite, la API
+responde `409 Conflict`.
 
 ```bash
-# Falla: email repetido
+# Falla: email que ya existe en los datos de ejemplo
 curl -X POST http://localhost:3000/api/estudiantes \
   -H "Content-Type: application/json" \
   -d '{"nombre":"José Ñáñez","email":"jose.nanez@correo.com","edad":22,"semestre":6,"facultadId":"'"$FACULTAD_ID"'"}'
 ```
 
-### Integridad referencial (parte del modelo 1:N)
+### Integridad del modelo embebido
 
-- No se crea un estudiante con una facultad que no existe (`400`).
-- No se elimina una facultad que tenga estudiantes (`409`).
-
-```bash
-curl -X DELETE "http://localhost:3000/api/facultades/$FACULTAD_ID"
-```
+- No se crea un estudiante si la facultad no existe (`400`).
+- Un estudiante no puede quedar huérfano: siempre está dentro de una facultad.
+- Al eliminar una facultad, se eliminan sus estudiantes embebidos.
+- Para cambiar un estudiante de facultad se elimina y se crea de nuevo.
 
 ---
 
-## 7. Trim y soporte de tildes/ñ
+## 8. Trim y soporte de tildes/ñ
 
 El `trim` está centralizado en `validaciones.js`:
 
@@ -302,31 +449,33 @@ const REGEX_NOMBRE = /^[\p{L}\s]+$/u;
 `\p{L}` significa **cualquier letra Unicode**, así que acepta `á é í ó ú ü ñ`
 y también letras de otros idiomas. La bandera `u` activa el modo Unicode.
 MongoDB guarda los textos en UTF-8, por lo que `José Ñáñez` se conserva tal cual.
-Además, las listas usan `collation: { locale: 'es', strength: 1 }` para ordenar
-correctamente en español.
+Las listas ordenan en español con `collation` y `localeCompare('es')`.
 
 ---
 
-## 8. Estructura del proyecto
+## 9. Estructura del proyecto
 
 ```text
 .
 ├── server.js              # Arranque de Express, rutas base y manejo de errores
-├── db.js                  # Conexión a MongoDB, índices y datos de ejemplo
+├── db.js                  # Conexión, índices y datos de ejemplo embebidos
 ├── validaciones.js        # Trim + las 3 validaciones
 ├── utilidades.js          # Paginación y validación de ObjectId
 ├── rutas/
-│   ├── facultades.js      # CRUD de facultades + endpoint 1:N
-│   └── estudiantes.js     # CRUD de estudiantes + paginación
+│   ├── facultades.js      # CRUD de facultades + paginación con $slice
+│   └── estudiantes.js     # CRUD sobre el arreglo embebido
 ├── package.json
 ├── package-lock.json
 ├── .gitignore
 └── README.md
 ```
 
+No hay carpeta ni colección de estudiantes: todo está en `rutas/estudiantes.js`
+y dentro de los documentos de `facultades`.
+
 ---
 
-## 9. Git: ramas del proyecto
+## 10. Git: ramas del proyecto
 
 El repositorio tiene dos ramas:
 
@@ -357,38 +506,56 @@ git push origin juan-dev
 
 ---
 
-## 10. Preguntas frecuentes para la sustentación
+## 11. Preguntas frecuentes para la sustentación
 
 **¿Dónde está la relación 1:N?**
-En el campo `facultadId` de cada estudiante. Una facultad puede tener muchos
-estudiantes, pero cada estudiante apunta a una sola facultad. Se consulta con
-`GET /api/facultades/:id/estudiantes` y se cuenta con `$lookup`.
+En el arreglo `estudiantes` dentro de cada documento de `facultades`. Una
+facultad contiene muchos estudiantes y cada estudiante está dentro de una sola
+facultad.
 
-**¿Por qué usar referencia y no incrustar los estudiantes dentro de la facultad?**
-Porque los estudiantes son entidades independientes, pueden ser muchos y se
-actualizan o eliminan individualmente. Con referencias se evita duplicar datos.
+**¿Por qué no hay una colección `estudiantes`?**
+Porque el modelo es embebido: los estudiantes son subdocumentos de la facultad.
+Eso permite leer la facultad con sus estudiantes en una sola consulta y eliminar
+todo en cascada.
+
+**¿Por qué embeber en vez de usar referencias?**
+Porque en este caso los estudiantes se consultan junto con su facultad y no se
+comparten entre facultades. Se evita un `JOIN`/`$lookup` y se simplifica el
+borrado. La desventaja es el límite de 16 MB por documento y que embeber no
+sirve si los datos se comparten o crecen demasiado.
+
+**¿Cómo se agrega, actualiza y elimina un estudiante embebido?**
+- Agregar: `$push` al arreglo `estudiantes`.
+- Actualizar: `$set` con `estudiantes.$`, que apunta al estudiante encontrado.
+- Eliminar: `$pull` para sacarlo del arreglo.
 
 **¿Cómo funciona la paginación?**
-Se leen `page` y `limit`, se calcula `skip = (page - 1) * limit` y se usa
-`.skip(saltar).limit(limite)`. También se cuenta el total con `countDocuments`
-para devolver `totalPaginas`.
+- En `/api/facultades/:id/estudiantes` se usa `$slice` para traer solo el tramo
+  del arreglo que corresponde a la página.
+- En `/api/estudiantes` se recorren las facultades, se arma una lista plana y se
+  pagina con `slice`.
+- Siempre se devuelve `pagina`, `limite`, `total` y `totalPaginas`.
 
-**¿Qué hace el trim y dónde se aplica?**
-Quita espacios al inicio y al final de los textos antes de validar y guardar.
-Está en `limpiarTexto()` y se aplica a nombre, email, código y `facultadId`.
+**¿Cómo se garantiza que el email no se repita?**
+Con una consulta `{ 'estudiantes.email': email }` antes de insertar o actualizar.
+No se puede crear un índice único sobre `estudiantes.email` porque es un arreglo;
+por eso la validación se hace en el código. El código de facultad sí tiene índice
+único.
 
-**¿Cómo se aceptan tildes y ñ?**
-Con la expresión regular `/^[\p{L}\s]+$/u`. `\p{L}` acepta letras Unicode
-(incluidas á, é, í, ó, ú, ü, ñ). MongoDB almacena UTF-8.
+**¿Qué pasa si se elimina una facultad con estudiantes?**
+Se eliminan también sus estudiantes, porque están embebidos dentro del mismo
+documento. La respuesta indica cuántos estudiantes se borraron.
+
+**¿Se puede cambiar un estudiante de facultad?**
+La API no lo permite directamente porque habría que sacar el subdocumento de un
+arreglo e insertarlo en otro. Para hacerlo se elimina el estudiante y se crea en
+la otra facultad. En producción se podría hacer con `$pull` + `$push` y una
+transacción.
 
 **¿Cuáles son las 3 validaciones?**
 1. Campos obligatorios después del trim.
 2. Formato y rangos (nombre, email, edad, semestre, código).
-3. Unicidad de email y código (con índice único).
-
-**¿Qué pasa si se elimina una facultad con estudiantes?**
-La API responde `409 Conflict` y no la elimina, para no dejar estudiantes
-huérfanos. Primero hay que eliminar o reasignar esos estudiantes.
+3. Unicidad de email y código.
 
 **¿Qué código de estado usa la API?**
 `200` para consultas y actualizaciones, `201` al crear, `400` para datos
