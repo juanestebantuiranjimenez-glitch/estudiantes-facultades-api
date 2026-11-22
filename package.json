@@ -1,0 +1,27 @@
+{
+  "name": "estudiantes-facultades-api",
+  "version": "1.0.0",
+  "description": "API REST con modelo 1:N estudiantes-facultades (Node.js + Express + MongoDB)",
+  "main": "server.js",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js"
+  },
+  "keywords": [
+    "nodejs",
+    "express",
+    "mongodb",
+    "crud",
+    "paginacion"
+  ],
+  "author": "Juan Esteban",
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19.0"
+  },
+  "dependencies": {
+    "express": "^5.3.0",
+    "mongodb": "^7.9.1"
+  }
+}
