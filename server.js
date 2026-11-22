@@ -16,22 +16,23 @@ async function iniciar() {
   // Página de ayuda con la lista de endpoints.
   app.get('/api', (req, res) => {
     res.json({
-      mensaje: 'API de estudiantes y facultades (modelo 1:N)',
+      mensaje: 'API de estudiantes y facultades (modelo 1:N con documentos embebidos)',
+      modelo: 'Cada facultad contiene un arreglo "estudiantes" dentro del mismo documento.',
       endpoints: {
         facultades: [
-          'GET    /api/facultades?page=1&limit=5',
-          'GET    /api/facultades/:id',
-          'GET    /api/facultades/:id/estudiantes?page=1&limit=5',
+          'GET    /api/facultades?page=1&limit=5            (lista paginada con totalEstudiantes)',
+          'GET    /api/facultades/:id                       (documento completo con estudiantes embebidos)',
+          'GET    /api/facultades/:id/estudiantes?page=1&limit=5 (arreglo embebido paginado)',
           'POST   /api/facultades',
           'PUT    /api/facultades/:id',
-          'DELETE /api/facultades/:id'
+          'DELETE /api/facultades/:id                       (elimina también sus estudiantes embebidos)'
         ],
         estudiantes: [
-          'GET    /api/estudiantes?page=1&limit=5&facultadId=...',
+          'GET    /api/estudiantes?page=1&limit=5&facultadId=... (lista global paginada)',
           'GET    /api/estudiantes/:id',
-          'POST   /api/estudiantes',
+          'POST   /api/estudiantes                          (inserta el estudiante dentro de su facultad)',
           'PUT    /api/estudiantes/:id',
-          'DELETE /api/estudiantes/:id'
+          'DELETE /api/estudiantes/:id                      (lo saca del arreglo embebido)'
         ]
       }
     });

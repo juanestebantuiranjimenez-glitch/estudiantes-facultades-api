@@ -1,7 +1,7 @@
 {
   "name": "estudiantes-facultades-api",
   "version": "1.0.0",
-  "description": "API REST con modelo 1:N estudiantes-facultades (Node.js + Express + MongoDB)",
+  "description": "API REST con modelo 1:N y documentos embebidos estudiantes-facultades (Node.js + Express + MongoDB)",
   "main": "server.js",
   "type": "commonjs",
   "scripts": {

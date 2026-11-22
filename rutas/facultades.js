@@ -6,8 +6,9 @@ const { esObjectId, obtenerPaginacion, datosPaginacion } = require('../utilidade
 // Recibe la conexión a la base de datos y devuelve el router de facultades.
 module.exports = function rutasFacultades(db) {
   const router = express.Router();
+
+  // Única colección: los estudiantes están embebidos aquí.
   const facultades = db.collection('facultades');
-  const estudiantes = db.collection('estudiantes');
 
   // CREATE - POST /api/facultades
   router.post('/', async (req, res, next) => {
@@ -23,7 +24,8 @@ module.exports = function rutasFacultades(db) {
         });
       }
 
-      const nueva = { ...valor, creadoEn: new Date() };
+      // Toda facultad nace con su arreglo de estudiantes vacío.
+      const nueva = { ...valor, estudiantes: [], creadoEn: new Date() };
       const resultado = await facultades.insertOne(nueva);
 
       res.status(201).json({
@@ -41,23 +43,15 @@ module.exports = function rutasFacultades(db) {
       const { pagina, limite, saltar } = obtenerPaginacion(req.query);
       const total = await facultades.countDocuments();
 
-      // $lookup une cada facultad con sus estudiantes para mostrar el 1:N.
+      // No se devuelve el arreglo completo en el listado, solo su tamaño.
       const data = await facultades
         .aggregate(
           [
+            { $addFields: { totalEstudiantes: { $size: '$estudiantes' } } },
+            { $project: { estudiantes: 0 } },
             { $sort: { nombre: 1 } },
             { $skip: saltar },
-            { $limit: limite },
-            {
-              $lookup: {
-                from: 'estudiantes',
-                localField: '_id',
-                foreignField: 'facultadId',
-                as: 'estudiantes'
-              }
-            },
-            { $addFields: { totalEstudiantes: { $size: '$estudiantes' } } },
-            { $project: { estudiantes: 0 } }
+            { $limit: limite }
           ],
           { collation: { locale: 'es', strength: 1 } }
         )
@@ -70,39 +64,44 @@ module.exports = function rutasFacultades(db) {
   });
 
   // READ - GET /api/facultades/:id/estudiantes?page=1&limit=5
-  // Lista los estudiantes de una facultad (el lado "muchos" de la relación).
+  // Pagina el arreglo embebido con $slice, sin traer todos los estudiantes.
   router.get('/:id/estudiantes', async (req, res, next) => {
     try {
       if (!esObjectId(req.params.id)) {
         return res.status(400).json({ error: 'El id de la facultad no es válido.' });
       }
 
-      const facultadId = new ObjectId(req.params.id);
-      const facultad = await facultades.findOne(
-        { _id: facultadId },
-        { projection: { nombre: 1, codigo: 1 } }
-      );
+      const _id = new ObjectId(req.params.id);
+      const { pagina, limite, saltar } = obtenerPaginacion(req.query);
 
-      if (!facultad) {
+      const resultado = await facultades
+        .aggregate([
+          { $match: { _id } },
+          {
+            $project: {
+              nombre: 1,
+              codigo: 1,
+              totalEstudiantes: { $size: '$estudiantes' },
+              estudiantes: { $slice: ['$estudiantes', saltar, limite] }
+            }
+          }
+        ])
+        .toArray();
+
+      if (resultado.length === 0) {
         return res.status(404).json({ error: 'Facultad no encontrada.' });
       }
 
-      const { pagina, limite, saltar } = obtenerPaginacion(req.query);
-      const filtro = { facultadId };
-      const total = await estudiantes.countDocuments(filtro);
-
-      const data = await estudiantes
-        .find(filtro)
-        .collation({ locale: 'es', strength: 1 })
-        .sort({ nombre: 1, _id: 1 })
-        .skip(saltar)
-        .limit(limite)
-        .toArray();
+      const facultad = resultado[0];
 
       res.json({
-        facultad,
-        data,
-        paginacion: datosPaginacion(pagina, limite, total)
+        facultad: {
+          _id: facultad._id,
+          nombre: facultad.nombre,
+          codigo: facultad.codigo
+        },
+        data: facultad.estudiantes,
+        paginacion: datosPaginacion(pagina, limite, facultad.totalEstudiantes)
       });
     } catch (error) {
       next(error);
@@ -116,16 +115,21 @@ module.exports = function rutasFacultades(db) {
         return res.status(400).json({ error: 'El id de la facultad no es válido.' });
       }
 
-      const _id = new ObjectId(req.params.id);
-      const facultad = await facultades.findOne({ _id });
+      const facultad = await facultades.findOne({
+        _id: new ObjectId(req.params.id)
+      });
 
       if (!facultad) {
         return res.status(404).json({ error: 'Facultad no encontrada.' });
       }
 
-      const totalEstudiantes = await estudiantes.countDocuments({ facultadId: _id });
-
-      res.json({ data: { ...facultad, totalEstudiantes } });
+      // Aquí sí se devuelve el documento completo con sus estudiantes embebidos.
+      res.json({
+        data: {
+          ...facultad,
+          totalEstudiantes: facultad.estudiantes.length
+        }
+      });
     } catch (error) {
       next(error);
     }
@@ -165,13 +169,20 @@ module.exports = function rutasFacultades(db) {
 
       const actualizada = await facultades.findOne({ _id });
 
-      res.json({ mensaje: 'Facultad actualizada.', data: actualizada });
+      res.json({
+        mensaje: 'Facultad actualizada.',
+        data: {
+          ...actualizada,
+          totalEstudiantes: actualizada.estudiantes.length
+        }
+      });
     } catch (error) {
       next(error);
     }
   });
 
   // DELETE - DELETE /api/facultades/:id
+  // Al estar embebidos, los estudiantes se eliminan junto con la facultad.
   router.delete('/:id', async (req, res, next) => {
     try {
       if (!esObjectId(req.params.id)) {
@@ -185,17 +196,16 @@ module.exports = function rutasFacultades(db) {
         return res.status(404).json({ error: 'Facultad no encontrada.' });
       }
 
-      // Integridad de la relación 1:N: no se borra una facultad con estudiantes.
-      const totalEstudiantes = await estudiantes.countDocuments({ facultadId: _id });
-      if (totalEstudiantes > 0) {
-        return res.status(409).json({
-          error: `No se puede eliminar la facultad porque tiene ${totalEstudiantes} estudiante(s) asociado(s).`
-        });
-      }
-
       await facultades.deleteOne({ _id });
 
-      res.json({ mensaje: 'Facultad eliminada.', data: facultad });
+      res.json({
+        mensaje: `Facultad eliminada junto con ${facultad.estudiantes.length} estudiante(s) embebido(s).`,
+        data: {
+          _id: facultad._id,
+          nombre: facultad.nombre,
+          codigo: facultad.codigo
+        }
+      });
     } catch (error) {
       next(error);
     }
