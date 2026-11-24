@@ -493,8 +493,6 @@ Las listas ordenan en español con `collation` y `localeCompare('es')`.
 ├── package.json
 ├── package-lock.json
 ├── .gitignore
-├── docs/
-│   └── Guia-Sustentacion.pdf  # Guía para explicar el proyecto al profesor
 └── README.md
 ```
 
@@ -528,9 +526,10 @@ cd estudiantes-facultades-api
 
 ## 11. Guía de sustentación en PDF
 
-En `docs/Guia-Sustentacion.pdf` está el documento de apoyo para explicar el
-proyecto al profesor: modelo 1:N, CRUD, paginación, validaciones, trim, tildes,
-endpoints y demo con curl.
+La guía de sustentación se entrega **por separado** junto con el proyecto
+(archivo `Guia-Sustentacion.pdf`). No se incluye en el repositorio; cubre el
+modelo 1:N, CRUD, paginación, validaciones, trim, tildes, endpoints y demo con
+curl.
 
 ---
 
