@@ -188,6 +188,28 @@ mongosh estudiantes_facultades --eval "db.estudiantes.drop()"
 
 ## 5. Endpoints
 
+### Tabla resumen de endpoints
+
+| # | Método   | Ruta                                              | Descripción                                              |
+| - | -------- | ------------------------------------------------- | -------------------------------------------------------- |
+| 1 | `GET`    | `/api`                                            | Ayuda con la lista de endpoints                          |
+| 2 | `GET`    | `/api/facultades?page=1&limit=5`                  | Lista **paginada** de facultades con `totalEstudiantes`  |
+| 3 | `GET`    | `/api/facultades/:id`                             | Facultad completa con sus estudiantes embebidos          |
+| 4 | `GET`    | `/api/facultades/:id/estudiantes?page=1&limit=5`  | Estudiantes embebidos **paginados** (`$slice`)           |
+| 5 | `POST`   | `/api/facultades`                                 | Crea una facultad con `estudiantes: []`                  |
+| 6 | `POST`   | `/api/facultades/:id/estudiantes`                 | **Agrega 1 estudiante embebido** a la facultad (`$push`) |
+| 7 | `PUT`    | `/api/facultades/:id`                             | Actualiza nombre y código de la facultad                 |
+| 8 | `DELETE` | `/api/facultades/:id`                             | Elimina la facultad y sus estudiantes (cascada)          |
+| 9 | `GET`    | `/api/estudiantes?page=1&limit=5&facultadId=...`  | Lista global **paginada** de todos los embebidos         |
+| 10 | `GET`   | `/api/estudiantes/:id`                            | Consulta un estudiante y su facultad                     |
+| 11 | `POST`  | `/api/estudiantes`                                | Alternativa: crea el estudiante con `facultadId` en el cuerpo |
+| 12 | `PUT`   | `/api/estudiantes/:id`                            | Actualiza los datos del estudiante embebido              |
+| 13 | `DELETE`| `/api/estudiantes/:id`                            | Saca el estudiante del arreglo embebido (`$pull`)        |
+
+> El endpoint pedido en el enunciado (`POST /courses/:id/students`) está
+> implementado como **`POST /api/facultades/:id/estudiantes`**: la facultad es el
+> "course" y el estudiante es el registro embebido que se agrega.
+
 ### Facultades
 
 | Método   | Ruta                                        | Descripción                                            |
@@ -196,6 +218,7 @@ mongosh estudiantes_facultades --eval "db.estudiantes.drop()"
 | `GET`    | `/api/facultades/:id`                       | Documento completo con estudiantes embebidos           |
 | `GET`    | `/api/facultades/:id/estudiantes?page=1&limit=5` | Arreglo embebido paginado con `$slice`            |
 | `POST`   | `/api/facultades`                           | Crea una facultad con `estudiantes: []`                |
+| `POST`   | `/api/facultades/:id/estudiantes`           | Agrega un estudiante embebido a esa facultad           |
 | `PUT`    | `/api/facultades/:id`                       | Actualiza nombre y código                              |
 | `DELETE` | `/api/facultades/:id`                       | Elimina la facultad y sus estudiantes embebidos        |
 
@@ -284,22 +307,23 @@ echo "$NUEVA_FACULTAD_ID"
 El nombre se guarda como `Ingeniería Ambiental` (trim y espacios normalizados)
 y el código como `ING-AMB`.
 
-### 6.8 Crear un estudiante embebido
+### 6.8 Agregar 1 estudiante embebido a una facultad (endpoint principal)
 
 ```bash
-curl -X POST http://localhost:3000/api/estudiantes \
+curl -X POST "http://localhost:3000/api/facultades/$NUEVA_FACULTAD_ID/estudiantes" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"nombre\": \"  Ana   Pérez  \",
-    \"email\": \"  ANA.PEREZ@correo.com  \",
-    \"edad\": 20,
-    \"semestre\": 4,
-    \"facultadId\": \"$NUEVA_FACULTAD_ID\"
-  }"
+  -d '{
+    "nombre": "  Ana   Pérez  ",
+    "email": "  ANA.PEREZ@correo.com  ",
+    "edad": 20,
+    "semestre": 4
+  }'
 ```
 
+La facultad se toma del **`:id` de la URL** (no hace falta enviar `facultadId`).
 Se guarda `nombre: "Ana Pérez"` y `email: "ana.perez@correo.com"` **dentro del
-documento de la facultad**.
+documento de la facultad** usando `$push`. Responde `201` con el estudiante y su
+facultad.
 
 Guardar el id del estudiante:
 
@@ -351,15 +375,14 @@ TEMP_ID=$(curl -s -X POST http://localhost:3000/api/facultades \
   -d '{"nombre":"Facultad Temporal","codigo":"TEMP"}' \
   | jq -r '.data._id')
 
-EST_TEMP_ID=$(curl -s -X POST http://localhost:3000/api/estudiantes \
+EST_TEMP_ID=$(curl -s -X POST "http://localhost:3000/api/facultades/$TEMP_ID/estudiantes" \
   -H "Content-Type: application/json" \
-  -d "{
-    \"nombre\": \"Carlos Ruiz\",
-    \"email\": \"carlos.ruiz@correo.com\",
-    \"edad\": 22,
-    \"semestre\": 6,
-    \"facultadId\": \"$TEMP_ID\"
-  }" \
+  -d '{
+    "nombre": "Carlos Ruiz",
+    "email": "carlos.ruiz@correo.com",
+    "edad": 22,
+    "semestre": 6
+  }' \
   | jq -r '.data._id')
 
 # Elimina la facultad y su estudiante embebido
@@ -379,7 +402,7 @@ curl "http://localhost:3000/api/estudiantes/$EST_TEMP_ID"
 uno, la API responde `400`. Para una facultad son obligatorios `nombre` y `codigo`.
 
 ```bash
-curl -X POST http://localhost:3000/api/estudiantes \
+curl -X POST "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes" \
   -H "Content-Type: application/json" \
   -d '{"nombre":"Ana"}'
 ```
@@ -394,9 +417,9 @@ curl -X POST http://localhost:3000/api/estudiantes \
 
 ```bash
 # Falla: el nombre contiene un número
-curl -X POST http://localhost:3000/api/estudiantes \
+curl -X POST "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes" \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"Ana2","email":"ana2@correo.com","edad":20,"semestre":4,"facultadId":"'"$FACULTAD_ID"'"}'
+  -d '{"nombre":"Ana2","email":"ana2@correo.com","edad":20,"semestre":4}'
 ```
 
 ### Validación 3: unicidad
@@ -411,9 +434,9 @@ responde `409 Conflict`.
 
 ```bash
 # Falla: email que ya existe en los datos de ejemplo
-curl -X POST http://localhost:3000/api/estudiantes \
+curl -X POST "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes" \
   -H "Content-Type: application/json" \
-  -d '{"nombre":"José Ñáñez","email":"jose.nanez@correo.com","edad":22,"semestre":6,"facultadId":"'"$FACULTAD_ID"'"}'
+  -d '{"nombre":"José Ñáñez","email":"jose.nanez@correo.com","edad":22,"semestre":6}'
 ```
 
 ### Integridad del modelo embebido
@@ -467,6 +490,8 @@ Las listas ordenan en español con `collation` y `localeCompare('es')`.
 ├── package.json
 ├── package-lock.json
 ├── .gitignore
+├── docs/
+│   └── Guia-Sustentacion.pdf  # Guía para explicar el proyecto al profesor
 └── README.md
 ```
 
@@ -475,38 +500,38 @@ y dentro de los documentos de `facultades`.
 
 ---
 
-## 10. Git: ramas del proyecto
+## 10. Git y repositorio
 
-El repositorio tiene dos ramas:
-
-- `main`: rama principal (queda solo con el commit inicial).
-- `juan-dev`: aquí está todo el desarrollo.
-
-Ver las ramas y los commits:
+El historial se construyó con **commits separados por funcionalidad**:
 
 ```bash
-git branch
-git log --oneline --graph --all
+git log --oneline
 ```
 
-Cuando quieras pasar los cambios a `main`:
+Ramas:
+
+- `main`: rama principal con la entrega final.
+- `juan-dev`: rama de desarrollo; se integra a `main` con merge.
+
+Para publicar el repositorio en GitHub:
 
 ```bash
-git checkout main
-git merge juan-dev
-```
-
-Si más adelante agregas un remoto (GitHub, GitLab, etc.):
-
-```bash
-git remote add origin <URL_DEL_REPOSITORIO>
+git remote add origin https://github.com/USUARIO/estudiantes-facultades.git
+git branch -M main
 git push -u origin main
-git push origin juan-dev
 ```
 
 ---
 
-## 11. Preguntas frecuentes para la sustentación
+## 11. Guía de sustentación en PDF
+
+En `docs/Guia-Sustentacion.pdf` está el documento de apoyo para explicar el
+proyecto al profesor: modelo 1:N, CRUD, paginación, validaciones, trim, tildes,
+endpoints y demo con curl.
+
+---
+
+## 12. Preguntas frecuentes para la sustentación
 
 **¿Dónde está la relación 1:N?**
 En el arreglo `estudiantes` dentro de cada documento de `facultades`. Una
