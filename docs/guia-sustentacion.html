@@ -1,0 +1,339 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<title>Guía de sustentación - API Estudiantes y Facultades</title>
+<style>
+  @page {
+    size: A4;
+    margin: 15mm 14mm 17mm 14mm;
+    @bottom-left { content: "API Estudiantes y Facultades — Guía de sustentación"; font-family: "DejaVu Sans"; font-size: 7.5pt; color: #6b7a90; }
+    @bottom-right { content: "Página " counter(page) " de " counter(pages); font-family: "DejaVu Sans"; font-size: 7.5pt; color: #6b7a90; }
+  }
+  @page:first {
+    @bottom-left { content: none; }
+    @bottom-right { content: none; }
+  }
+  body { font-family: "DejaVu Sans", Arial, sans-serif; font-size: 10pt; color: #1a1a1a; line-height: 1.42; margin: 0; }
+  h1 { font-size: 22pt; color: #1f3864; margin: 0 0 6pt 0; }
+  h2 { font-size: 13.5pt; color: #1f3864; border-bottom: 2px solid #2e75b6; padding-bottom: 3pt; margin-top: 16pt; margin-bottom: 8pt; page-break-after: avoid; }
+  h3 { font-size: 11pt; color: #2e75b6; margin-top: 11pt; margin-bottom: 4pt; page-break-after: avoid; }
+  p { margin: 4pt 0 7pt 0; text-align: justify; }
+  ul, ol { margin: 4pt 0 8pt 18pt; padding: 0; }
+  li { margin-bottom: 3pt; }
+  code { font-family: "DejaVu Sans Mono", monospace; font-size: 8.4pt; background-color: #eef3f9; color: #17365d; }
+  pre { font-family: "DejaVu Sans Mono", monospace; font-size: 8.2pt; line-height: 1.28; background-color: #f4f6f9; border: 1px solid #cfd8e3; border-left: 3px solid #2e75b6; padding: 7pt 9pt; margin: 5pt 0 9pt 0; white-space: pre-wrap; page-break-inside: avoid; }
+  table { border-collapse: collapse; width: 100%; margin: 6pt 0 10pt 0; }
+  tr { page-break-inside: avoid; }
+  th { background-color: #1f3864; color: #ffffff; font-size: 9pt; padding: 5pt; text-align: left; border: 1px solid #1f3864; }
+  td { font-size: 9pt; padding: 4pt 5pt; border: 1px solid #b8c6d9; vertical-align: top; }
+  tr.alt td { background-color: #eef3f9; }
+  .cover { background-color: #1f3864; color: #ffffff; padding: 28pt 26pt 24pt 26pt; margin: 0 0 18pt 0; page-break-inside: avoid; }
+  .cover h1 { color: #ffffff; font-size: 25pt; margin-bottom: 10pt; }
+  .cover .sub { color: #d6e4f5; font-size: 12pt; margin-bottom: 20pt; line-height: 1.45; text-align: left; }
+  .cover table { margin: 0; }
+  .cover td { color: #ffffff; border: none; font-size: 10pt; padding: 3pt 10pt 3pt 0; background-color: transparent; }
+  .box { background-color: #eef3f9; border-left: 4px solid #2e75b6; padding: 7pt 10pt; margin: 8pt 0 10pt 0; page-break-inside: avoid; }
+  .warn { background-color: #fff5e5; border-left: 4px solid #d99100; padding: 7pt 10pt; margin: 8pt 0 10pt 0; page-break-inside: avoid; }
+  .ok { color: #1e6b34; font-weight: bold; }
+  .bad { color: #a61b1b; font-weight: bold; }
+  .small { font-size: 8.5pt; color: #555555; }
+  .center { text-align: center; }
+</style>
+</head>
+<body>
+
+<div class="cover">
+  <h1>API REST: Estudiantes y Facultades</h1>
+  <div class="sub">Modelo 1:N con documentos embebidos en MongoDB<br>Node.js + Express + MongoDB</div>
+  <table>
+    <tr><td><b>Estudiante:</b></td><td>Juan Esteban Tuirán Jiménez</td></tr>
+    <tr><td><b>Proyecto:</b></td><td>CRUD completo con paginación, validaciones y registro embebido</td></tr>
+    <tr><td><b>Fecha de entrega:</b></td><td>24 de noviembre de 2026</td></tr>
+  </table>
+</div>
+
+<h2>1. Resumen del proyecto</h2>
+<p>
+Se construyó una API REST para administrar <b>facultades</b> y sus <b>estudiantes</b> usando el modelo
+<b>1:N con documentos embebidos</b> de MongoDB. No existe una colección independiente de estudiantes:
+cada estudiante vive dentro del arreglo <code>estudiantes</code> de su facultad. La API implementa el
+<b>CRUD completo</b>, listados <b>paginados</b>, <b>tres validaciones</b>, limpieza de espacios
+(<b>trim</b>) y soporte para <b>tildes y ñ</b>.
+</p>
+
+<table>
+  <tr><th style="width:55%">Requisito del enunciado</th><th style="width:45%">Dónde se cumple</th></tr>
+  <tr><td>Modelo estudiantes–facultades 1:N</td><td>Arreglo <code>estudiantes</code> dentro de cada facultad</td></tr>
+  <tr class="alt"><td>CRUD completo</td><td>Crear, listar, consultar, actualizar y eliminar facultades y estudiantes</td></tr>
+  <tr><td>Listar debe paginar</td><td><code>?page=1&amp;limit=5</code> en los tres listados</td></tr>
+  <tr class="alt"><td>3 validaciones</td><td>Obligatorios, formato/rangos y unicidad</td></tr>
+  <tr><td>Hacer trim</td><td><code>limpiarTexto()</code> en <code>validaciones.js</code></td></tr>
+  <tr class="alt"><td>Aceptar tildes y ñ</td><td>Regex Unicode <code>/^[\p{L}\s]+$/u</code></td></tr>
+  <tr><td>Agregar 1 registro embebido</td><td><code>POST /api/facultades/:id/estudiantes</code> con <code>$push</code></td></tr>
+  <tr class="alt"><td>README con comandos curl y tabla de endpoints</td><td>Archivo <code>README.md</code></td></tr>
+  <tr><td>Mínimo 3 commits</td><td>Historial separado por funcionalidad (ver sección 10)</td></tr>
+</table>
+
+<h2>2. Modelo 1:N embebido</h2>
+<p>
+Una <b>facultad</b> contiene <b>muchos estudiantes</b>. En MongoDB esto se representa con un arreglo de
+subdocumentos dentro del mismo documento. La relación se lee completa en una sola consulta, sin
+<code>$lookup</code> ni <code>JOIN</code>.
+</p>
+<pre>{
+  "_id": ObjectId("6b0354700d92622fc59b4034"),
+  "nombre": "Ingeniería de Sistemas",
+  "codigo": "ING-SIS",
+  "estudiantes": [
+    {
+      "_id": ObjectId("..."),
+      "nombre": "José Ñáñez",
+      "email": "jose.nanez@correo.com",
+      "edad": 20,
+      "semestre": 4,
+      "creadoEn": ISODate("...")
+    },
+    {
+      "_id": ObjectId("..."),
+      "nombre": "María Peña",
+      "email": "maria.pena@correo.com",
+      "edad": 21,
+      "semestre": 5
+    }
+  ],
+  "creadoEn": ISODate("...")
+}</pre>
+
+<table>
+  <tr><th style="width:30%">Operación</th><th style="width:35%">Operador MongoDB</th><th style="width:35%">Efecto</th></tr>
+  <tr><td>Agregar estudiante</td><td><code>$push: { estudiantes: nuevo }</code></td><td>Inserta al final del arreglo</td></tr>
+  <tr class="alt"><td>Actualizar estudiante</td><td><code>$set: { "estudiantes.$.nombre": ... }</code></td><td>El operador <code>$</code> apunta al subdocumento encontrado</td></tr>
+  <tr><td>Eliminar estudiante</td><td><code>$pull: { estudiantes: { _id } }</code></td><td>Saca el subdocumento del arreglo</td></tr>
+  <tr class="alt"><td>Eliminar facultad</td><td><code>deleteOne({ _id })</code></td><td>Borra también sus estudiantes (cascada)</td></tr>
+  <tr><td>Paginar embebidos</td><td><code>$slice: ['$estudiantes', saltar, limite]</code></td><td>Trae solo el tramo de la página</td></tr>
+</table>
+
+<div class="box">
+<b>¿Por qué embeber y no referenciar?</b> Los estudiantes siempre se consultan junto con su facultad y
+no se comparten entre facultades. Embeber evita un <code>$lookup</code>, simplifica el borrado en cascada
+y permite leer todo en una sola operación. La desventaja es el límite de 16 MB por documento y que no
+sirve si los datos crecen demasiado o se comparten.
+</div>
+
+<h2>3. CRUD completo</h2>
+<table>
+  <tr><th style="width:14%">Operación</th><th style="width:43%">Facultades</th><th style="width:43%">Estudiantes embebidos</th></tr>
+  <tr><td><b>Create</b></td><td><code>POST /api/facultades</code></td><td><code>POST /api/facultades/:id/estudiantes</code></td></tr>
+  <tr class="alt"><td><b>Read</b></td><td><code>GET /api/facultades</code> (paginado)<br><code>GET /api/facultades/:id</code></td><td><code>GET /api/estudiantes</code> (paginado)<br><code>GET /api/estudiantes/:id</code><br><code>GET /api/facultades/:id/estudiantes</code> (paginado)</td></tr>
+  <tr><td><b>Update</b></td><td><code>PUT /api/facultades/:id</code></td><td><code>PUT /api/estudiantes/:id</code></td></tr>
+  <tr class="alt"><td><b>Delete</b></td><td><code>DELETE /api/facultades/:id</code> (cascada)</td><td><code>DELETE /api/estudiantes/:id</code></td></tr>
+</table>
+
+<h2>4. Endpoint solicitado: agregar 1 registro embebido</h2>
+<p>
+El enunciado pide <code>POST /courses/:id/students</code>. En este dominio, "course" es la
+<b>facultad</b> y "student" es el <b>estudiante</b>, por lo que el endpoint equivalente es:
+</p>
+<div class="box"><b>POST /api/facultades/:id/estudiantes</b><br>
+Agrega un estudiante al arreglo embebido de la facultad indicada en la URL.</div>
+
+<h3>Petición</h3>
+<pre>curl -X POST "http://localhost:3000/api/facultades/$FACULTAD_ID/estudiantes" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "nombre": "  Ana   María   Peñaranda  ",
+    "email": "  ANA.PENARANDA@Correo.com  ",
+    "edad": 21,
+    "semestre": 6
+  }'</pre>
+
+<h3>Respuesta real de la API (201 Created)</h3>
+<pre>{
+  "mensaje": "Estudiante agregado al arreglo embebido de la facultad.",
+  "data": {
+    "_id": "6b04e2215d6577d015a7f7d4",
+    "nombre": "Ana María Peñaranda",
+    "email": "ana.penaranda@correo.com",
+    "edad": 21,
+    "semestre": 6,
+    "creadoEn": "2026-11-24T01:02:25.997Z",
+    "facultad": {
+      "_id": "6b0354700d92622fc59b4034",
+      "nombre": "Ingeniería de Sistemas",
+      "codigo": "ING-SIS"
+    }
+  },
+  "totalEstudiantes": 4
+}</pre>
+<p>
+Observe que el <b>trim</b> dejó <code>"Ana María Peñaranda"</code>, el email se normalizó a minúsculas y
+el campo <code>facultadId</code> <b>no se envía en el cuerpo</b>: se toma del <code>:id</code> de la URL.
+</p>
+
+<h3>Casos de error comprobados</h3>
+<table>
+  <tr><th style="width:18%">Código</th><th style="width:42%">Situación</th><th style="width:40%">Mensaje</th></tr>
+  <tr><td class="bad">400</td><td>Falta un campo obligatorio</td><td>Los campos nombre, email, edad y semestre son obligatorios.</td></tr>
+  <tr class="alt"><td class="bad">400</td><td>Nombre con números (<code>Ana2</code>)</td><td>El nombre solo puede contener letras (con tildes y ñ) y espacios.</td></tr>
+  <tr><td class="bad">400</td><td>Edad fuera de rango</td><td>La edad debe ser un número entero entre 15 y 100.</td></tr>
+  <tr class="alt"><td class="bad">404</td><td>La facultad no existe</td><td>Facultad no encontrada.</td></tr>
+  <tr><td class="bad">409</td><td>Email repetido</td><td>Ya existe un estudiante con el email ...</td></tr>
+  <tr class="alt"><td class="ok">201</td><td>Datos válidos</td><td>Estudiante agregado al arreglo embebido de la facultad.</td></tr>
+</table>
+
+<h2>5. Paginación</h2>
+<p>
+Todos los listados reciben <code>page</code> y <code>limit</code>. El límite por defecto es 5 y el máximo 50.
+La respuesta siempre incluye <code>pagina</code>, <code>limite</code>, <code>total</code> y
+<code>totalPaginas</code> para que el cliente sepa cuántas páginas existen.
+</p>
+<pre>GET /api/facultades?page=1&amp;limit=2</pre>
+<pre>{
+  "data": [
+    { "codigo": "ADMON", "nombre": "Administración de Empresas", "totalEstudiantes": 1 },
+    { "codigo": "SALUD", "nombre": "Ciencias de la Salud", "totalEstudiantes": 2 }
+  ],
+  "paginacion": { "pagina": 1, "limite": 2, "total": 3, "totalPaginas": 2 }
+}</pre>
+<table>
+  <tr><th style="width:45%">Listado</th><th style="width:55%">Cómo pagina</th></tr>
+  <tr><td><code>GET /api/facultades</code></td><td><code>$skip</code> + <code>$limit</code> sobre la colección</td></tr>
+  <tr class="alt"><td><code>GET /api/facultades/:id/estudiantes</code></td><td><code>$slice</code> sobre el arreglo embebido</td></tr>
+  <tr><td><code>GET /api/estudiantes</code></td><td>Lista plana ordenada en español + <code>slice</code></td></tr>
+</table>
+<p class="small">En <code>/api/facultades</code> el listado no devuelve el arreglo completo, solo su tamaño
+(<code>totalEstudiantes</code>), para que la respuesta sea liviana.</p>
+
+<h2>6. Las 3 validaciones, trim y tildes/ñ</h2>
+<table>
+  <tr><th style="width:22%">Validación</th><th style="width:48%">Regla</th><th style="width:30%">Dónde</th></tr>
+  <tr><td><b>1. Obligatorios</b></td><td>Facultad: <code>nombre</code> y <code>codigo</code>.<br>Estudiante: <code>nombre</code>, <code>email</code>, <code>edad</code>, <code>semestre</code> y <code>facultadId</code> (o el <code>:id</code> de la URL). Se revisan <b>después del trim</b>.</td><td><code>validaciones.js</code></td></tr>
+  <tr class="alt"><td><b>2. Formato y rangos</b></td><td>Nombre: solo letras y espacios, 3–80 caracteres.<br>Email: <code>usuario@dominio.com</code>.<br>Edad: entero 15–100. Semestre: entero 1–10.<br>Código: 2–10 caracteres <code>A-Z</code>, <code>0-9</code> o <code>-</code>.</td><td><code>validaciones.js</code></td></tr>
+  <tr><td><b>3. Unicidad</b></td><td>El <code>codigo</code> de facultad no se repite (índice único).<br>El <code>email</code> no se repite entre todos los estudiantes embebidos (consulta antes de insertar o actualizar).</td><td><code>db.js</code> y rutas</td></tr>
+</table>
+
+<h3>Trim centralizado</h3>
+<pre>function limpiarTexto(valor) {
+  if (typeof valor !== "string") return "";
+  return valor.trim().replace(/\s+/g, " ");
+}
+// "  José   Ñáñez  "  ->  "José Ñáñez"</pre>
+<p>
+<code>trim()</code> quita espacios al inicio y al final; el reemplazo deja un solo espacio entre palabras.
+El email se pasa a minúsculas y el código de facultad a mayúsculas.
+</p>
+
+<h3>Tildes y ñ</h3>
+<pre>const REGEX_NOMBRE = /^[\p{L}\s]+$/u;</pre>
+<p>
+<code>\p{L}</code> significa <b>cualquier letra Unicode</b>, así que acepta <code>á é í ó ú ü ñ</code> y
+letras de otros idiomas. La bandera <code>u</code> activa el modo Unicode. MongoDB guarda UTF-8, por lo
+que <code>José Ñáñez</code> se conserva tal cual; además los listados ordenan en español con
+<code>collation</code> y <code>localeCompare("es")</code>.
+</p>
+
+<h2>7. Tabla resumen de endpoints</h2>
+<table>
+  <tr><th style="width:8%">#</th><th style="width:11%">Método</th><th style="width:47%">Ruta</th><th style="width:34%">Descripción</th></tr>
+  <tr><td>1</td><td>GET</td><td><code>/api</code></td><td>Ayuda con la lista de endpoints</td></tr>
+  <tr class="alt"><td>2</td><td>GET</td><td><code>/api/facultades?page=1&amp;limit=5</code></td><td>Lista paginada de facultades</td></tr>
+  <tr><td>3</td><td>GET</td><td><code>/api/facultades/:id</code></td><td>Facultad con estudiantes embebidos</td></tr>
+  <tr class="alt"><td>4</td><td>GET</td><td><code>/api/facultades/:id/estudiantes?page=1&amp;limit=5</code></td><td>Embebidos paginados con <code>$slice</code></td></tr>
+  <tr><td>5</td><td>POST</td><td><code>/api/facultades</code></td><td>Crea una facultad</td></tr>
+  <tr class="alt"><td>6</td><td>POST</td><td><code>/api/facultades/:id/estudiantes</code></td><td><b>Agrega 1 estudiante embebido</b></td></tr>
+  <tr><td>7</td><td>PUT</td><td><code>/api/facultades/:id</code></td><td>Actualiza una facultad</td></tr>
+  <tr class="alt"><td>8</td><td>DELETE</td><td><code>/api/facultades/:id</code></td><td>Elimina facultad y estudiantes (cascada)</td></tr>
+  <tr><td>9</td><td>GET</td><td><code>/api/estudiantes?page=1&amp;limit=5&amp;facultadId=...</code></td><td>Lista global paginada de embebidos</td></tr>
+  <tr class="alt"><td>10</td><td>GET</td><td><code>/api/estudiantes/:id</code></td><td>Consulta un estudiante y su facultad</td></tr>
+  <tr><td>11</td><td>POST</td><td><code>/api/estudiantes</code></td><td>Alternativa con <code>facultadId</code> en el cuerpo</td></tr>
+  <tr class="alt"><td>12</td><td>PUT</td><td><code>/api/estudiantes/:id</code></td><td>Actualiza el estudiante embebido</td></tr>
+  <tr><td>13</td><td>DELETE</td><td><code>/api/estudiantes/:id</code></td><td>Elimina el estudiante embebido</td></tr>
+</table>
+
+<h2>8. Demo para la sustentación (paso a paso)</h2>
+<ol>
+  <li>Verificar MongoDB: <code>mongosh --quiet --eval "db.runCommand({ ping: 1 })"</code></li>
+  <li>Instalar y arrancar: <code>npm install</code> y <code>npm start</code></li>
+  <li>Abrir la ayuda: <code>curl http://localhost:3000/api</code></li>
+  <li>Listar facultades paginadas: <code>curl "http://localhost:3000/api/facultades?page=1&amp;limit=2"</code></li>
+  <li>Guardar el id de una facultad en <code>FACULTAD_ID</code>.</li>
+  <li>Agregar un estudiante embebido con el endpoint de la sección 4.</li>
+  <li>Ver la facultad completa: <code>curl "http://localhost:3000/api/facultades/$FACULTAD_ID"</code></li>
+  <li>Paginar sus estudiantes: <code>curl ".../estudiantes?page=1&amp;limit=2"</code></li>
+  <li>Actualizar y eliminar el estudiante con <code>PUT</code> y <code>DELETE</code>.</li>
+  <li>Mostrar en MongoDB Compass la base <code>estudiantes_facultades</code> y la colección <code>facultades</code>.</li>
+</ol>
+<div class="warn">
+Recuerda tener MongoDB corriendo antes de <code>npm start</code>. Al primer arranque se crean 3 facultades
+de ejemplo con 6 estudiantes embebidos.
+</div>
+
+<h2>9. Evidencia de pruebas realizadas</h2>
+<table>
+  <tr><th style="width:55%">Prueba</th><th style="width:15%">Resultado</th><th style="width:30%">Estado</th></tr>
+  <tr><td>POST con <code>"  Ana   María   Peñaranda  "</code></td><td>201</td><td><span class="ok">Correcto</span>: guardó "Ana María Peñaranda"</td></tr>
+  <tr class="alt"><td>POST con email en mayúsculas y espacios</td><td>201</td><td><span class="ok">Correcto</span>: normalizó a minúsculas</td></tr>
+  <tr><td>POST sin campos obligatorios</td><td>400</td><td><span class="ok">Correcto</span></td></tr>
+  <tr class="alt"><td>POST con nombre <code>Ana2</code></td><td>400</td><td><span class="ok">Correcto</span></td></tr>
+  <tr><td>POST con email repetido</td><td>409</td><td><span class="ok">Correcto</span></td></tr>
+  <tr class="alt"><td>POST en facultad inexistente</td><td>404</td><td><span class="ok">Correcto</span></td></tr>
+  <tr><td>GET con <code>page=2&amp;limit=2</code></td><td>200</td><td><span class="ok">Correcto</span>: devolvió el segundo tramo</td></tr>
+  <tr class="alt"><td>PUT y DELETE del estudiante</td><td>200</td><td><span class="ok">Correcto</span></td></tr>
+</table>
+
+<h2>10. Historial de Git</h2>
+<p>El proyecto se construyó con commits separados por funcionalidad (más de los 3 mínimos):</p>
+<pre>git log --oneline
+
+fa6b74a feat(api): endpoint POST /api/facultades/:id/estudiantes para agregar registro embebido
+e4d2309 docs(readme): tabla resumen de endpoints y ejemplos curl del registro embebido
+3a58ad7 docs: documentar endpoints, ejemplos curl y guía de sustentación
+6673578 refactor: embeber estudiantes dentro de las facultades
+f1a95dd feat: CRUD de estudiantes con paginación y manejo de errores
+c600675 feat: CRUD de facultades y endpoint 1:N
+ecac0f6 feat: conexión a MongoDB, índices y validaciones con trim
+987e881 chore: inicializar proyecto Node.js con Express y MongoDB</pre>
+<p>
+La rama de desarrollo es <code>juan-dev</code> y la entrega final queda en <code>main</code>.
+El repositorio se publica como repositorio público en GitHub.
+</p>
+
+<h2>11. Posibles preguntas del profesor</h2>
+<table>
+  <tr><th style="width:38%">Pregunta</th><th style="width:62%">Respuesta corta</th></tr>
+  <tr><td>¿Dónde está la relación 1:N?</td><td>En el arreglo <code>estudiantes</code> dentro de cada documento de <code>facultades</code>: una facultad tiene muchos estudiantes y cada estudiante vive en una sola facultad.</td></tr>
+  <tr class="alt"><td>¿Por qué no hay colección de estudiantes?</td><td>Porque el modelo es embebido: los estudiantes son subdocumentos. Así se leen con la facultad en una sola consulta y se eliminan en cascada.</td></tr>
+  <tr><td>¿Cómo se agrega un estudiante?</td><td>Con <code>$push</code> al arreglo embebido, en <code>POST /api/facultades/:id/estudiantes</code>.</td></tr>
+  <tr class="alt"><td>¿Cómo se actualiza un embebido?</td><td>Con <code>$set</code> y el operador posicional <code>$</code>, que apunta al subdocumento encontrado.</td></tr>
+  <tr><td>¿Cómo se elimina?</td><td>Con <code>$pull</code> para sacarlo del arreglo; si se elimina la facultad, se borran todos sus estudiantes.</td></tr>
+  <tr class="alt"><td>¿Cómo se pagina el arreglo embebido?</td><td>Con <code>$slice</code>, que trae solo el tramo de la página, sin cargar todo el arreglo.</td></tr>
+  <tr><td>¿Cómo se evita un email repetido?</td><td>Consultando <code>{ "estudiantes.email": email }</code> antes de insertar o actualizar y respondiendo <code>409</code>.</td></tr>
+  <tr class="alt"><td>¿Por qué no hay índice único en el email?</td><td>Porque está dentro de un arreglo; el índice único se usa para el código de facultad y la unicidad del email se valida en código.</td></tr>
+  <tr><td>¿Qué pasa con los 16 MB?</td><td>Es el límite por documento. Embeber sirve aquí porque los estudiantes son pocos y no se comparten; si creciera demasiado se usaría referencias.</td></tr>
+  <tr class="alt"><td>¿Qué hace el trim y qué pasa con la ñ?</td><td>Quita espacios sobrantes y normaliza; la regex Unicode <code>\p{L}</code> acepta tildes y ñ sin problema.</td></tr>
+</table>
+
+<h2>12. Cómo ejecutar el proyecto</h2>
+<pre># 1. Requisitos: Node.js 20.19+ y MongoDB local en 127.0.0.1:27017
+mongosh --quiet --eval "db.runCommand({ ping: 1 })"
+
+# 2. Instalar dependencias
+npm install
+
+# 3. Arrancar la API
+npm start
+
+# 4. Probar
+curl http://localhost:3000/api
+curl "http://localhost:3000/api/facultades?page=1&amp;limit=5"</pre>
+<p class="small">
+Variables opcionales: <code>PORT</code> (3000), <code>MONGODB_URI</code>
+(mongodb://127.0.0.1:27017) y <code>MONGODB_DB</code> (estudiantes_facultades).
+El README del repositorio contiene todos los comandos curl y la tabla completa de endpoints.
+</p>
+
+<p class="center small">Documento generado como apoyo para la sustentación del proyecto.</p>
+
+</body>
+</html>
