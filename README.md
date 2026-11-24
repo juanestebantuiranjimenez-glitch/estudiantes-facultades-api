@@ -6,6 +6,9 @@ con **paginación**, **3 validaciones**, **trim** y soporte para **tildes y ñ**
 
 Stack: **Node.js + Express + MongoDB** (driver oficial `mongodb`).
 
+**Repositorio público:**
+<https://github.com/juanestebantuiranjimenez-glitch/estudiantes-facultades-api>
+
 > En esta versión **no existe una colección `estudiantes`**. Cada facultad es un
 > documento que contiene un arreglo llamado `estudiantes` con sus estudiantes
 > embebidos.
@@ -513,12 +516,12 @@ Ramas:
 - `main`: rama principal con la entrega final.
 - `juan-dev`: rama de desarrollo; se integra a `main` con merge.
 
-Para publicar el repositorio en GitHub:
+**Repositorio público:**
+<https://github.com/juanestebantuiranjimenez-glitch/estudiantes-facultades-api>
 
 ```bash
-git remote add origin https://github.com/USUARIO/estudiantes-facultades.git
-git branch -M main
-git push -u origin main
+git clone https://github.com/juanestebantuiranjimenez-glitch/estudiantes-facultades-api.git
+cd estudiantes-facultades-api
 ```
 
 ---
