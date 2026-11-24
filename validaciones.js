@@ -22,10 +22,14 @@ function esEntero(valor) {
   return false;
 }
 
-function validarEstudiante(body = {}) {
+// facultadIdExterno permite tomar la facultad desde la URL
+// (POST /api/facultades/:id/estudiantes) en lugar del cuerpo.
+function validarEstudiante(body = {}, facultadIdExterno) {
   const nombre = limpiarTexto(body.nombre);
   const email = limpiarTexto(body.email).toLowerCase();
-  const facultadId = limpiarTexto(body.facultadId);
+  const facultadId = facultadIdExterno
+    ? limpiarTexto(facultadIdExterno)
+    : limpiarTexto(body.facultadId);
   const edad = body.edad;
   const semestre = body.semestre;
 
@@ -42,7 +46,9 @@ function validarEstudiante(body = {}) {
     semestre === ''
   ) {
     return {
-      error: 'Los campos nombre, email, edad, semestre y facultadId son obligatorios.'
+      error: facultadIdExterno
+        ? 'Los campos nombre, email, edad y semestre son obligatorios.'
+        : 'Los campos nombre, email, edad, semestre y facultadId son obligatorios.'
     };
   }
 

@@ -1,6 +1,6 @@
 const express = require('express');
 const { ObjectId } = require('mongodb');
-const { validarFacultad } = require('../validaciones');
+const { validarFacultad, validarEstudiante } = require('../validaciones');
 const { esObjectId, obtenerPaginacion, datosPaginacion } = require('../utilidades');
 
 // Recibe la conexión a la base de datos y devuelve el router de facultades.
@@ -31,6 +31,67 @@ module.exports = function rutasFacultades(db) {
       res.status(201).json({
         mensaje: 'Facultad creada.',
         data: { _id: resultado.insertedId, ...nueva }
+      });
+    } catch (error) {
+      next(error);
+    }
+  });
+
+  // CREATE - POST /api/facultades/:id/estudiantes
+  // Agrega UN estudiante embebido dentro de la facultad indicada en la URL.
+  // Es el endpoint principal del modelo 1:N (equivalente a POST /courses/:id/students).
+  router.post('/:id/estudiantes', async (req, res, next) => {
+    try {
+      if (!esObjectId(req.params.id)) {
+        return res.status(400).json({ error: 'El id de la facultad no es válido.' });
+      }
+
+      // La facultad se toma del :id de la URL y se valida junto al resto.
+      const { error, valor } = validarEstudiante(req.body, req.params.id);
+      if (error) return res.status(400).json({ error });
+
+      const _id = new ObjectId(req.params.id);
+      const facultad = await facultades.findOne({ _id });
+      if (!facultad) {
+        return res.status(404).json({ error: 'Facultad no encontrada.' });
+      }
+
+      // VALIDACIÓN 3: el email no se puede repetir entre todos los embebidos.
+      const repetido = await facultades.findOne({
+        'estudiantes.email': valor.email
+      });
+      if (repetido) {
+        return res.status(409).json({
+          error: `Ya existe un estudiante con el email ${valor.email}.`
+        });
+      }
+
+      const nuevo = {
+        _id: new ObjectId(),
+        nombre: valor.nombre,
+        email: valor.email,
+        edad: valor.edad,
+        semestre: valor.semestre,
+        creadoEn: new Date()
+      };
+
+      // $push inserta el subdocumento en el arreglo de esta facultad.
+      await facultades.updateOne(
+        { _id },
+        { $push: { estudiantes: nuevo } }
+      );
+
+      res.status(201).json({
+        mensaje: 'Estudiante agregado al arreglo embebido de la facultad.',
+        data: {
+          ...nuevo,
+          facultad: {
+            _id: facultad._id,
+            nombre: facultad.nombre,
+            codigo: facultad.codigo
+          }
+        },
+        totalEstudiantes: facultad.estudiantes.length + 1
       });
     } catch (error) {
       next(error);

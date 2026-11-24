@@ -23,6 +23,7 @@ async function iniciar() {
           'GET    /api/facultades?page=1&limit=5            (lista paginada con totalEstudiantes)',
           'GET    /api/facultades/:id                       (documento completo con estudiantes embebidos)',
           'GET    /api/facultades/:id/estudiantes?page=1&limit=5 (arreglo embebido paginado)',
+          'POST   /api/facultades/:id/estudiantes            (agrega UN estudiante embebido)',
           'POST   /api/facultades',
           'PUT    /api/facultades/:id',
           'DELETE /api/facultades/:id                       (elimina también sus estudiantes embebidos)'
